@@ -1,0 +1,41 @@
+# 跟踪测试环境的 Python 依赖（IsaacGym 镜像之外的部分）
+#
+# 这套组合在开发机上完整跑通 600 步验收（BENCH_PLAN.md §6），**别单独升某个包**。
+# 装法见 Dockerfile（pytorch3d 单独一行 --no-deps，原因见下）。
+
+# numpy/scipy 必须**一起**指定版本：基础镜像自带 scipy 1.6.3 要求 numpy<1.23，
+# 不一起升，pip 会把 numpy 降到 1.22，和 aerial_gym 的 numpy==1.23 冲突。
+numpy==1.23.5
+scipy==1.10.1
+
+# 传感器/光线投射渲染（深度 + 分割图）
+warp-lang==1.0.0
+
+# aerial_gym 的 import：gymnasium 是新版接口，gym 是 position_setpoint_task 里
+# `from gym.spaces import ...` 的旧接口，两个都要。
+gym==0.26.2
+gymnasium==1.1.1
+
+# URDF/网格加载（aerial_gym/assets/warp_asset.py: from urdfpy import URDF）
+# networkx==2.2、pycollada==0.6 是 urdfpy 的 pin，别升（aerial_gym 自己不 import networkx）。
+# 注意：urdfpy 本体**不用 pip 装** —— PyPI 版有 cylinder mesh 的 bug，
+# 要用 GitHub master（见 scripts/setup_workspace.sh），通过 PYTHONPATH 导入。
+networkx==2.2
+pycollada==0.6
+trimesh==4.12.2
+
+# fvcore/iopath 是 pytorch3d 的依赖（Dockerfile 里 --no-deps 装 pytorch3d，补上这两个）
+fvcore
+iopath
+
+# 录像/图像 IO（tests/acceptance/check_p1.py 写 mp4；主流程 run_bench.py 只写 json/md）
+imageio==2.35.1
+imageio-ffmpeg==0.5.1
+
+# urdfpy.show() 的懒依赖（运行时不会碰到，留着免得以后调可视化缺包）
+pyrender==0.1.45
+PyOpenGL==3.1.0
+pyglet==2.1.16
+
+# pytorch3d 预编译 wheel 装不到的东西里 ninja 用不上，但开发机上有、体积小，保持一致
+ninja==1.13.2

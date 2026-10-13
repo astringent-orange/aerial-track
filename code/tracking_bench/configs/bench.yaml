@@ -1,0 +1,39 @@
+# 跟踪器测试环境的默认配置（BENCH_PLAN.md §2.5）
+#
+# 跑起来之后这一份（连同实际生效的默认值）会落盘到输出目录的
+# config_snapshot.yaml —— 复现一次实验就靠它 + seed。
+#
+# ⚠️ 布局 / 路点几何约束在 arena_yaml 里（waypoints: 一节），
+#    别在 target_policy 里重复写。
+
+arena_yaml: configs/arena_20x20.yaml   # 相对 /workspace（跑之前先 cd /workspace）
+
+camera:
+  image: [270, 480]
+  hfov_deg: 87.0
+  max_range: 10.0     # 深度图 +1.0 的阈值
+  min_range: 0.2      # 深度图 -1.0 的阈值
+
+target_policy:
+  type: waypoint      # WaypointPolicy（P2）：路点 + 分段五次
+  v_cruise: 1.2       # m/s
+  a_max: 1.5          # m/s^2
+  t_min: 1.0          # s
+  n_waypoints: 6
+  speed_scale: 1.0
+
+tracker:
+  type: baseline      # baseline | do_nothing | 别人注册的类名
+  action_mode: position
+  standoff: 2.0       # m，baseline 用：沿目标速度反方向退这么远
+
+episode:
+  max_steps: 600      # 600 步 x 0.1 s = 60 s
+  lost_timeout: 3.0   # s，**连续**丢失这么长判失败（默认 3 s = 30 步）
+  lost_criterion: in_fov   # in_fov | visible。默认 in_fov，等真上感知再切 visible
+  collision_is_fail: true
+  settle_steps: 40    # episode 开头把追踪机摆到起始位姿用的稳态步数
+
+seed: 20261012
+num_envs: 1
+use_warp: true        # true = depth/seg，**1 张卡**；false = RGB，**2 张卡**

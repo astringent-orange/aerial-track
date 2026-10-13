@@ -1,0 +1,23 @@
+# 上游源码：setup_workspace.sh 运行时 clone 进来（带本地补丁），绝不入库
+code/aerial_gym_simulator/
+code/urdfpy/
+
+# 运行产物：保留目录骨架（.gitkeep）和 README，内容一律不入库
+outputs/*
+!outputs/README.md
+!outputs/runs/
+!outputs/videos/
+!outputs/figures/
+!outputs/scratch/
+outputs/runs/*
+outputs/videos/*
+outputs/figures/*
+outputs/scratch/*
+!outputs/runs/.gitkeep
+!outputs/videos/.gitkeep
+!outputs/figures/.gitkeep
+!outputs/scratch/.gitkeep
+
+# Python 垃圾
+__pycache__/
+*.pyc

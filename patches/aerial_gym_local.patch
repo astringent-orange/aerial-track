@@ -1,0 +1,678 @@
+diff --git a/aerial_gym/config/asset_config/cylinder_asset_config.py b/aerial_gym/config/asset_config/cylinder_asset_config.py
+new file mode 100644
+index 0000000..70f167c
+--- /dev/null
++++ b/aerial_gym/config/asset_config/cylinder_asset_config.py
+@@ -0,0 +1,83 @@
++"""圆柱体资产配置。
++
++配套的 URDF 由 tracking_bench/assets/make_cylinder_assets.py 生成，
++送到 aerial_gym/resources/models/environment_assets/cylinders/。
++
++和 env_object_config.py 里的 object_asset_params 是同一套写法，
++区别只在资产目录、数量、和"立在地面上"的位置约束。
++"""
++
++import numpy as np
++from aerial_gym import AERIAL_GYM_DIRECTORY
++from aerial_gym.config.asset_config.env_object_config import asset_state_params
++
++
++class cylinder_asset_params(asset_state_params):
++    # 每个环境里放几个圆柱。太多会在空间里互相穿插，15 个在
++    # 10m x 10m 的场地里比较合适。
++    num_assets = 15
++
++    asset_folder = (
++        f"{AERIAL_GYM_DIRECTORY}/resources/models/environment_assets/cylinders"
++    )
++
++    # 位置/姿态的取值范围，13 个元素，格式是：
++    #   [ratio_x, ratio_y, ratio_z, roll, pitch, yaw, 1.0, vx, vy, vz, wx, wy, wz]
++    #
++    # 注意前 3 个是**环境边界的比例**（0=下界，1=上界），
++    # 而 roll/pitch/yaw 是**绝对弧度**，不是比例 —— 名字叫 ratio 但并非比例。
++    #
++    # z 固定为 0：URDF 里圆柱的原点在底面，所以 z=0 就是"立在地面上"。
++    # 想让圆柱悬空分布，把 z 那一位改成 0.3~0.8 即可。
++    #
++    # x 从 0.3 起而不是 0：四旋翼出生点在 x 比例 0.1~0.2 处，
++    # 避开它，免得一开机就卡在圆柱里。
++    min_state_ratio = [
++        0.30,
++        0.05,
++        0.0,
++        0.0,  # roll  固定 0
++        0.0,  # pitch 固定 0
++        -np.pi,
++        1.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++    ]
++    max_state_ratio = [
++        0.95,
++        0.95,
++        0.0,
++        0.0,  # roll  固定 0
++        0.0,  # pitch 固定 0
++        np.pi,
++        1.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++    ]
++
++    # roll/pitch 必须是 0。URDF 的原点在底面，一旦倾斜圆柱就会一头扎进地面。
++    # yaw 可以随便转（圆柱绕自身轴转外观不变，留着是为了以后换非对称形状）。
++
++    # -1 = 每个实例分配独立的分割 id（从 100 递增）。
++    # 跟踪实验要区分"是哪一个圆柱"，所以保留 -1。
++    semantic_id = -1
++
++    # 静态障碍物：固定住不参与物理，位置由上面的 ratio 决定。
++    # 想让他们被撞飞/倒下来，改成 False 并确认环境开了 ground plane。
++    fix_base_link = True
++
++    # 默认是 True，会把碰撞体换成胶囊（两端是圆头），
++    # 和视觉上的圆柱对不上。这里关掉，让碰撞和视觉都是真正的圆柱。
++    replace_cylinder_with_capsule = False
++
++    # URDF 里已经写好了每个圆柱自己的颜色（见 make_cylinder_assets.py 的调色板），
++    # 这里不覆盖。
++    color = None
+diff --git a/aerial_gym/config/asset_config/target_asset_config.py b/aerial_gym/config/asset_config/target_asset_config.py
+new file mode 100644
+index 0000000..ab2ee78
+--- /dev/null
++++ b/aerial_gym/config/asset_config/target_asset_config.py
+@@ -0,0 +1,88 @@
++"""跟踪实验的「目标物」资产配置。
++
++URDF 由 tracking_bench/assets/make_target_asset.py 生成，落在
++resources/models/environment_assets/target_drone/target_orb.urdf。
++
++和障碍物配置的差别全在**让它能被推动**这一件事上：
++    fix_base_link = False   —— True 的话是静态物体，写速度没用
++    disable_gravity = True  —— 不关重力它会掉到地板上
++    keep_in_env  = True     —— 排到槽位最前（见下）
++    min_state_ratio == max_state_ratio  —— 每次 reset 回到同一个起点
++
++⚠️ 槽位：`asset_loader.select_and_order_assets()` 对 keep_in_env 的资产用
++`appendleft`，所以 `asset_type_to_dict_map` 里**后写的插更前**。
++target 必须放在 map 的**最后一个**，才会落到槽位 0 —— 也就是驱动代码里的
++`twist[:, 0, :]`。放错位置的症状是"目标不动、别的东西在飞"，而且不报错。
++"""
++
++import numpy as np
++from aerial_gym import AERIAL_GYM_DIRECTORY
++from aerial_gym.config.asset_config.env_object_config import asset_state_params
++
++
++class target_asset_params(asset_state_params):
++    # 只要一个目标
++    num_assets = 1
++
++    asset_folder = (
++        f"{AERIAL_GYM_DIRECTORY}/resources/models/environment_assets/target_drone"
++    )
++    # 指定文件而不是从目录里随机挑 —— 目标物只有一种形状
++    file = "target_orb.urdf"
++
++    # 13 个元素：[ratio_x, ratio_y, ratio_z, roll, pitch, yaw, 1.0, vx, vy, vz, wx, wy, wz]
++    # 前 3 位是**环境边界的比例**，roll/pitch/yaw 是**绝对弧度**（名字有歧义）。
++    #
++    # min == max 是故意的：reset_idx 会用这对范围重新采样位置，
++    # 两边相等就等于"每次 reset 都回到同一个点"，目标不会被随机挪走。
++    # 对 10x10x5 场地（x,y in [-5,5], z in [0,5]）来说，
++    # ratio (0.7, 0.5, 0.4) 就是绝对坐标 (2.0, 0.0, 2.0) ——
++    # 正好是 CircleTrajectory 在 t=0 的位置，开局就对齐。
++    min_state_ratio = [
++        0.7,
++        0.5,
++        0.4,
++        0.0,
++        0.0,
++        0.0,
++        1.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++    ]
++    max_state_ratio = [
++        0.7,
++        0.5,
++        0.4,
++        0.0,
++        0.0,
++        0.0,
++        1.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++        0.0,
++    ]
++
++    # -1 = 每个实例分配独立的分割 id（从 100 递增）。
++    # 目标只有一个实例，留 -1 可以免费拿到它的真值掩码，
++    # 以后做感知验证直接用，不用再改配置。
++    semantic_id = -1
++
++    # 排到槽位最前（appendleft）。配合 map 里放在最后 -> 槽位 0。
++    keep_in_env = True
++
++    # 这两项是"能不能被推动"的关键，和障碍物配置相反
++    fix_base_link = False
++    disable_gravity = True
++
++    # 默认 True 会把碰撞体换成胶囊，和视觉上的圆柱对不上
++    replace_cylinder_with_capsule = False
++
++    # 颜色写在 URDF 里了，这里不覆盖
++    color = None
+diff --git a/aerial_gym/config/asset_config/wall_asset_config.py b/aerial_gym/config/asset_config/wall_asset_config.py
+new file mode 100644
+index 0000000..d12749d
+--- /dev/null
++++ b/aerial_gym/config/asset_config/wall_asset_config.py
+@@ -0,0 +1,127 @@
++"""薄墙资产配置 —— 从 configs/arena_20x20.yaml 动态生成，一面墙一个类。
++
++为什么一面墙一个类（而不是一个类放 N 个实例）：
++`asset_loader.select_and_order_assets()` 里同一个类的多个实例是**逐个** `appendleft`
++插进去的，于是组内实例顺序会**反过来**。一个类一面墙，槽位就和 YAML 里的序号
++一一对应，不用维护"第 i 个实例落在哪个槽"这种易错的映射。
++
++为什么 min_state_ratio == max_state_ratio：
++`asset_manager.reset_idx()` 每次 reset 都用这对范围重新采样位置。两边相等就等于
++"每次 reset 都回到同一个点"，墙不会被随机挪走。比例值由 YAML 的绝对坐标直接换算，
++所以**即使忘了 pin 布局，墙也落在正确位置** —— pin 只是保险。
++
++⚠️ URDF 原点在**底面**（make_wall_assets.py 统一的约定），所以 z 的比例恒为 0，
++   即"立在地面上"。现成的 objects/1_x_1_wall.urdf 是原点在几何中心的写法，别混用。
++
++改场地的方法：
++    1. 编辑 tracking_bench/configs/arena_20x20.yaml（布局唯一来源）
++    2. python tracking_bench/assets/make_wall_assets.py
++    3. 重新跑（本文件在 import 时重新读 YAML，不用改代码）
++"""
++
++import os
++
++import yaml
++
++from aerial_gym import AERIAL_GYM_DIRECTORY
++from aerial_gym.config.asset_config.env_object_config import asset_state_params
++
++# YAML 是场地布局的唯一来源，放在 aerial_gym 包外面。按两级找：
++#   1. tracking_bench/configs/（P5 之后的正源，自包含包里）
++#   2. configs/（老工作区布局，兜底）
++# ⚠️ 别写死成某一级 —— 2026-10-12 清理 code/ 时删了老的 configs/，
++#    这里没跟着改，下一次建环境就 FileNotFoundError（见 docs/SETUP_NOTES.md 阶段 4）。
++_CFG_CANDIDATES = [
++    os.path.normpath(os.path.join(AERIAL_GYM_DIRECTORY, "..",
++                                  "tracking_bench", "configs", "arena_20x20.yaml")),
++    os.path.normpath(os.path.join(AERIAL_GYM_DIRECTORY, "..",
++                                  "configs", "arena_20x20.yaml")),
++]
++CFG_PATH = next((p for p in _CFG_CANDIDATES if os.path.isfile(p)), _CFG_CANDIDATES[0])
++ASSET_DIR = (
++    f"{AERIAL_GYM_DIRECTORY}/resources/models/environment_assets/walls_thin"
++)
++
++if not os.path.isfile(CFG_PATH):
++    raise FileNotFoundError(
++        f"找不到场地布局文件。找过：{_CFG_CANDIDATES}。"
++        f"它是 thin wall 的唯一来源，缺了就没法建环境。"
++    )
++
++with open(CFG_PATH, encoding="utf-8") as _f:
++    ARENA = yaml.safe_load(_f)
++
++# ---- 导出给别的模块用 ----
++WALL_LAYOUT = ARENA["walls"]  # [{size, pos, yaw}, ...]，**YAML 里的顺序**
++ARENA_BOUNDS_MIN = ARENA["arena"]["bounds_min"]
++ARENA_BOUNDS_MAX = ARENA["arena"]["bounds_max"]
++WAYPOINT_CFG = ARENA.get("waypoints", {})
++
++
++def _state_ratio(pos_xy, yaw):
++    """把绝对坐标/转角换算成 13 元素的 min_state_ratio。
++
++    前 3 位是**环境边界的比例**（0 = 下界，1 = 上界），
++    roll/pitch/yaw 那 3 位是**绝对弧度**（名字叫 ratio 但不是比例，踩过坑）。
++    """
++    bmin, bmax = ARENA_BOUNDS_MIN, ARENA_BOUNDS_MAX
++    return [
++        (pos_xy[0] - bmin[0]) / (bmax[0] - bmin[0]),
++        (pos_xy[1] - bmin[1]) / (bmax[1] - bmin[1]),
++        0.0,  # origin 在底面 -> z=0 就立在地上
++        0.0,  # roll  必须 0，否则墙会一头扎进地面
++        0.0,  # pitch 同上
++        float(yaw),
++        1.0,
++        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
++    ]
++
++
++def _make_wall_class(idx, wall):
++    """给第 idx 面墙造一个资产类。"""
++    fname = f"wall_{idx:02d}.urdf"
++    ratio = _state_ratio(wall["pos"], wall["yaw"])
++
++    class _Wall(asset_state_params):
++        num_assets = 1
++        asset_folder = ASSET_DIR
++        file = fname  # 指定文件而不是从目录随机挑：一面墙一个文件，槽位才对得上
++
++        # min == max：每次 reset 回到同一个位置/朝向，可复现
++        min_state_ratio = ratio
++        max_state_ratio = ratio
++
++        # -1 = 每个实例分配独立的分割 id（从 100 递增），跟踪实验要区分是哪面墙
++        semantic_id = -1
++
++        # 前插到槽位队首（appendleft）。配合 tracking_env 的 map 顺序决定最终槽位。
++        keep_in_env = True
++
++        # 静态墙：不参与物理，不会被撞飞
++        fix_base_link = True
++
++        # 默认 True 会把碰撞体换成胶囊，和视觉上的长方体对不上
++        replace_cylinder_with_capsule = False
++
++        # 颜色写在 URDF 里了（make_wall_assets.py），这里不覆盖
++        color = None
++
++    _Wall.__name__ = f"wall_asset_{idx:02d}"
++    _Wall.__qualname__ = _Wall.__name__
++    return _Wall
++
++
++# 按 YAML 顺序，一面墙一个类
++WALL_ASSET_CLASSES = [
++    _make_wall_class(i, w) for i, w in enumerate(WALL_LAYOUT)
++]
++
++# 资产 URDF 必须已经存在（make_wall_assets.py 生成）。缺了就报清楚，
++# 别等到 AssetLoader 里抛一个难懂的错。
++for _i, _w in enumerate(WALL_LAYOUT):
++    _p = os.path.join(ASSET_DIR, f"wall_{_i:02d}.urdf")
++    if not os.path.isfile(_p):
++        raise FileNotFoundError(
++            f"缺墙体 URDF：{_p}\n"
++            f"先跑：python tracking_bench/assets/make_wall_assets.py"
++        )
+diff --git a/aerial_gym/config/env_config/empty_with_cylinders.py b/aerial_gym/config/env_config/empty_with_cylinders.py
+new file mode 100644
+index 0000000..f5cfaa1
+--- /dev/null
++++ b/aerial_gym/config/env_config/empty_with_cylinders.py
+@@ -0,0 +1,78 @@
++"""空环境 + 随机分布的圆柱体。
++
++从 EmptyEnvCfg 出发，只多做三件事：
++  1. 把场地放大（默认空环境只有 ±1m，放不下东西）
++  2. 挂上 cylinder_asset_params（随机圆柱）
++  3. 挂上 bottom_wall 当**地板 mesh**
++
++没有墙、没有板子、没有树 —— 就是一块地板加若干柱子。
++每个环境的圆柱位置都是随机采样的，而且每次 reset 会重新随机。
++
++关于地板（踩过的坑，2026-09-24）：
++    `create_ground_plane = True` 加的是 IsaacGym 的**解析平面**（gym.add_ground），
++    它只参与物理碰撞，**没有三角面片**。而 warp 传感器（depth/seg）的射线只打
++    asset 的三角 mesh（见 warp_env_manager.py 里 CONST_WARP_MESH_ID_LIST 的构造），
++    所以解析地面在深度/分割图里**完全不可见** —— 拍出来是一堆悬在虚空里的柱子。
++    别的环境没这问题，只是因为它们自带 bottom_wall 这块地板 mesh。
++    这里同样挂一块（20x20x0.2 的 box，顶面在 z=+0.1），深度图就有地面了。
++
++用法（容器内，先 cd /workspace）：
++    # 只看结构（depth，占 1 张卡）—— 日常调环境用这个
++    python record_sim.py --env empty_with_cylinders --device cuda:5 \\
++        --pan --pan-pos -4 0 1.5 --out cyl.mp4
++
++    # 要看 RGB / 分割（占 2 张卡）
++    python record_sim.py --env empty_with_cylinders --view all \\
++        --use-warp False --device cuda:5 --pan --out cyl_rgb.mp4
++"""
++
++from aerial_gym.config.asset_config.cylinder_asset_config import cylinder_asset_params
++from aerial_gym.config.asset_config.env_object_config import bottom_wall
++
++
++class EmptyWithCylindersCfg:
++    class env:
++        num_envs = 4
++        num_env_actions = 4  # 位置控制器要 4 个：目标 x, y, z + 偏航角
++
++        env_spacing = 5.0
++
++        num_physics_steps_per_env_step_mean = 10
++        num_physics_steps_per_env_step_std = 0
++        render_viewer_every_n_steps = 1
++
++        collision_force_threshold = 0.05
++        manual_camera_trigger = False
++        reset_on_collision = True
++
++        # 解析地面：保证物理上有个底（无人机不会掉下去）。
++        # 注意它**不会**出现在 depth/seg 里，传感器要的地面靠下面的 bottom_wall
++        # mesh 提供 —— 两者都要，原因见文件头。
++        create_ground_plane = True
++
++        sample_timestep_for_latency = True
++        perturb_observations = True
++        keep_same_env_for_num_episodes = 1
++        write_to_sim_at_every_timestep = False
++
++        # 10m x 10m x 5m 的场地。
++        # 四旋翼出生点在比例的 0.1~0.2 处，也就是 x ≈ -4 ~ -3 那一带。
++        use_warp = True
++        lower_bound_min = [-5.0, -5.0, 0.0]
++        lower_bound_max = [-5.0, -5.0, 0.0]
++        upper_bound_min = [5.0, 5.0, 5.0]
++        upper_bound_max = [5.0, 5.0, 5.0]
++
++    class env_config:
++        # 圆柱 + 一块地板 mesh，别的都关掉
++        include_asset_type = {
++            "cylinders": True,
++            "bottom_wall": True,
++        }
++
++        asset_type_to_dict_map = {
++            "cylinders": cylinder_asset_params,
++            # 复用障碍物环境那块 20x20x0.2 的地板。它 keep_in_env=True，
++            # 会被优先放进场景，位置固定在场地说中心（ratio 0.5, 0.5）。
++            "bottom_wall": bottom_wall,
++        }
+diff --git a/aerial_gym/config/env_config/tracking_env.py b/aerial_gym/config/env_config/tracking_env.py
+new file mode 100644
+index 0000000..81e6c9f
+--- /dev/null
++++ b/aerial_gym/config/env_config/tracking_env.py
+@@ -0,0 +1,175 @@
++"""跟踪实验环境 —— 20x20x5 场地 + 地板 + 薄墙 + 圆柱 + 1 个可动目标。
++
++从 empty_with_cylinders 出发，改了跟踪实验必需的几处：
++
++  1. **多挂一个目标资产**（`target_asset_params`）
++  2. **多挂一圈薄墙**（`wall_asset_config`，布局来自 configs/arena_20x20.yaml）
++  3. **`reset_on_collision = False`** ← 最要紧的一条，见下
++  4. 场地从 10x10 扩到 **20x20**，圆柱挪到外围
++
++### ⚠️ `reset_on_collision` 必须是 False
++
++`empty_with_cylinders` 里是 True，意味着追踪机一碰到障碍物就重置整个 episode，
++目标位置跟着跳变，录出来的视频直接废掉。跟踪是长时段的连续过程，
++不能被碰撞打断。（撞了也不会有任何惩罚，就是不重置而已。）
++
++### 槽位顺序：target 必须放在 map 最后
++
++`asset_loader.select_and_order_assets()` 对 `keep_in_env=True` 的资产用
++`appendleft` 插到队首，所以 **map 里越靠后的 keep_in_env 资产槽位越靠前**。
++`keep_in_env=False` 的资产用 `append` 追加到队尾。
++
++本文件的 map 顺序是
++`cylinders(keep=F) -> wall_00..wall_07(keep=T) -> bottom_wall(keep=T) -> target(keep=T)`，
++于是实际槽位是：
++
++    槽 0      target         <- 驱动代码写 twist[:, 0, :]
++    槽 1      bottom_wall    <- 地板 mesh
++    槽 2..9   walls（8 面，**YAML 逆序**：槽 2 = wall_07 ... 槽 9 = wall_00）
++    槽 10..15 cylinders（6 根）
++
++改 map 顺序会改槽位，驱动代码就会推错东西，而且**不报错**。
++启动时用 `check_p1.py` / `run_tracking.py` 打印 `ASSET_SLOT_ORDER` 核对一次。
++
++### 墙 / 圆柱位置
++
++配置里同一类资产的**所有实例共用一对** min/max_state_ratio
++（`asset_loader.py:87` 是按资产类取的，不是按实例）。
++
++- **墙**：一面墙一个类，min == max，位置由 YAML 直接算出 -> reset 就是对的。
++- **圆柱**：6 根共用一个类，做不到 6 个不同位置，只能在 reset 之后由
++  `tracking_lib.pin_cylinder_layout()` 覆写状态张量。
++
++用法（容器内，先 cd /workspace）：
++    python record_sim.py --env tracking_env --device cuda:6 --out tracking.mp4
++"""
++
++from collections import deque
++
++from aerial_gym.config.asset_config.cylinder_asset_config import cylinder_asset_params
++from aerial_gym.config.asset_config.env_object_config import bottom_wall
++from aerial_gym.config.asset_config.target_asset_config import target_asset_params
++from aerial_gym.config.asset_config.wall_asset_config import (
++    ARENA_BOUNDS_MAX,
++    ARENA_BOUNDS_MIN,
++    WALL_ASSET_CLASSES,
++)
++
++
++class _tracking_cylinders(cylinder_asset_params):
++    """6 根圆柱，放在 20x20 场地的外围。
++
++    薄墙已经在半径 5.5~6.4 围了一圈，圆柱放到更外圈（半径 8.5）当散点障碍，
++    不挡中心的飞行空间。实际布局由 tracking_lib.pin_cylinder_layout() 固定覆写。
++    """
++
++    num_assets = 6
++
++    # x, y 比例在 [0.02, 0.98]，接近全场地 —— 固定布局会覆盖掉。
++    # z 保持 0（URDF 原点在底面，z=0 就立在地上）。
++    min_state_ratio = [
++        0.02, 0.02, 0.0, 0.0, 0.0, -3.14159265, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
++    ]
++    max_state_ratio = [
++        0.98, 0.98, 0.0, 0.0, 0.0, 3.14159265, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
++    ]
++
++
++# ---- 组装资产表 ----------------------------------------------------------
++#
++# ⚠️ 顺序 = 槽位（keep_in_env 的后写者排更前）。target 必须在最后一位，
++#    才会落到槽位 0。墙按 YAML 顺序插在圆柱和地板之间。
++_include_asset_type = {"cylinders": True}
++_asset_type_to_dict_map = {"cylinders": _tracking_cylinders}
++
++for _i, _cls in enumerate(WALL_ASSET_CLASSES):
++    _key = f"wall_{_i:02d}"
++    _include_asset_type[_key] = True
++    _asset_type_to_dict_map[_key] = _cls
++
++_include_asset_type["bottom_wall"] = True
++_asset_type_to_dict_map["bottom_wall"] = bottom_wall
++
++_include_asset_type["target"] = True
++_asset_type_to_dict_map["target"] = target_asset_params
++
++
++def compute_asset_slot_order(asset_map, include_map):
++    """复现 `asset_loader.select_and_order_assets()` 的排序，得到槽位表。
++
++    为什么要自己算：槽位搞错的症状是"驱动了圆柱/地板"，**不报错、不警告**。
++    与其等跑起来发现不对，不如在 import 时就把顺序算出来打印核对。
++
++    规则（asset_loader.py:174）：`keep_in_env=True` 的实例逐个 `appendleft`
++    插到队首（**组内逆序**），`keep_in_env=False` 的逐个 `append` 追加到队尾。
++    """
++    ordered = deque()
++    for asset_type, cfg in asset_map.items():
++        if asset_type in include_map and include_map[asset_type] is False:
++            continue
++        for i in range(cfg.num_assets):
++            if getattr(cfg, "keep_in_env", False):
++                ordered.appendleft((asset_type, i))
++            else:
++                ordered.append((asset_type, i))
++    return list(ordered)
++
++
++# 形如 [("target", 0), ("bottom_wall", 0), ("wall_07", 0), ..., ("cylinders", 5)]
++ASSET_SLOT_ORDER = compute_asset_slot_order(_asset_type_to_dict_map, _include_asset_type)
++
++# 形如 {"target": 0, "bottom_wall": 1, "wall_00": 9, ..., "cylinders": 10}
++# 注意多实例类（cylinders）这里只记**第一个**实例的槽位。
++ASSET_SLOT = {key: slot for slot, (key, _i) in enumerate(ASSET_SLOT_ORDER)}
++
++
++class TrackingEnvCfg:
++    class env:
++        num_envs = 4
++        num_env_actions = 4  # 位置控制器要 4 个：目标 x, y, z + 偏航角
++
++        env_spacing = 5.0
++
++        num_physics_steps_per_env_step_mean = 10
++        num_physics_steps_per_env_step_std = 0
++        render_viewer_every_n_steps = 1
++
++        collision_force_threshold = 0.05
++        manual_camera_trigger = False
++
++        # ⚠️ 见文件头。True 会让撞柱子触发 reset，视频废掉。
++        reset_on_collision = False
++
++        # 解析地面管物理（无人机不掉下去）；传感器要的地面靠 bottom_wall mesh。
++        create_ground_plane = True
++
++        sample_timestep_for_latency = True
++        perturb_observations = True
++        keep_same_env_for_num_episodes = 1
++
++        # ⚠️ 这一项是"目标能不能动"的开关，踩过一次坑（2026-09-30）。
++        #
++        # `obstacle_manager.pre_physics_step()` 只是把速度写进状态张量，
++        # 张量要靠 `IGE_env.write_to_sim()` 才会送到物理引擎，而它只在
++        # `IGE_env.pre_physics_step()` 里被调用，且**仅当这个开关为 True**
++        # （IGE_env_manager.py:442-443）。
++        #
++        # 为 False 时的症状是：状态张量里的位置纹丝不动、不报错、不警告，
++        # 看起来就像"速度没写进去"。官方唯一一个资产会动的环境
++        # （dynamic_environment.py）这项目是 True。
++        write_to_sim_at_every_timestep = True
++
++        # 20m x 20m x 5m。边界值和 configs/arena_20x20.yaml 的 arena.bounds_* 一致，
++        # 那份 YAML 是布局的唯一来源，两边必须同步改。
++        use_warp = True  # depth/seg，单卡
++        lower_bound_min = list(ARENA_BOUNDS_MIN)
++        lower_bound_max = list(ARENA_BOUNDS_MIN)
++        upper_bound_min = list(ARENA_BOUNDS_MAX)
++        upper_bound_max = list(ARENA_BOUNDS_MAX)
++
++    class env_config:
++        include_asset_type = _include_asset_type
++
++        # ⚠️ 顺序 = 槽位（keep_in_env 的后写者排更前）。
++        # target 必须在最后一位，才会落到槽位 0。
++        asset_type_to_dict_map = _asset_type_to_dict_map
+diff --git a/aerial_gym/config/sensor_config/camera_config/base_depth_camera_config.py b/aerial_gym/config/sensor_config/camera_config/base_depth_camera_config.py
+index 6998de5..b593705 100644
+--- a/aerial_gym/config/sensor_config/camera_config/base_depth_camera_config.py
++++ b/aerial_gym/config/sensor_config/camera_config/base_depth_camera_config.py
+@@ -52,7 +52,12 @@ class BaseDepthCameraConfig(BaseSensorConfig):
+     )  # Will be [-1]U[0,1] if normalize_range is True, otherwise will be value set by user in place of -1.0
+ 
+     # randomize placement of the sensor
+-    randomize_placement = True
++    #
++    # 原本是 True（域随机化，RL 训练用）。跟踪实验要**固定的外参**，否则
++    # 相机位姿每次 reset 抖 ±2.5cm / ±5°，以后算目标在相机系下的位置会对不上
++    # （docs/TRACKING_PLAN.md §4.5）。2026-09-30 改为 False。
++    # 要做 RL 域随机化时改回 True 即可。
++    randomize_placement = False
+     min_translation = [0.07, -0.06, 0.01]
+     max_translation = [0.12, 0.03, 0.04]
+     min_euler_rotation_deg = [-5.0, -5.0, -5.0]
+diff --git a/aerial_gym/env_manager/__init__.py b/aerial_gym/env_manager/__init__.py
+index 909667c..9fdb8c4 100644
+--- a/aerial_gym/env_manager/__init__.py
++++ b/aerial_gym/env_manager/__init__.py
+@@ -5,6 +5,8 @@ from aerial_gym.config.env_config.empty_env import EmptyEnvCfg
+ from aerial_gym.config.env_config.forest_env import ForestEnvCfg
+ from aerial_gym.config.env_config.env_config_2ms import EnvCfg2Ms
+ from aerial_gym.config.env_config.dynamic_environment import DynamicEnvironmentCfg
++from aerial_gym.config.env_config.empty_with_cylinders import EmptyWithCylindersCfg
++from aerial_gym.config.env_config.tracking_env import TrackingEnvCfg
+ 
+ from aerial_gym.registry.env_registry import env_config_registry
+ 
+@@ -14,3 +16,5 @@ env_config_registry.register("empty_env", EmptyEnvCfg)
+ env_config_registry.register("forest_env", ForestEnvCfg)
+ env_config_registry.register("empty_env_2ms", EnvCfg2Ms)
+ env_config_registry.register("dynamic_env", DynamicEnvironmentCfg)
++env_config_registry.register("empty_with_cylinders", EmptyWithCylindersCfg)
++env_config_registry.register("tracking_env", TrackingEnvCfg)
+diff --git a/aerial_gym/env_manager/warp_env_manager.py b/aerial_gym/env_manager/warp_env_manager.py
+index ce3942a..dcd054f 100644
+--- a/aerial_gym/env_manager/warp_env_manager.py
++++ b/aerial_gym/env_manager/warp_env_manager.py
+@@ -37,27 +37,48 @@ class WarpEnv(BaseManager):
+         self.VERTEX_MAPS_PER_ENV_ORIGINAL = None
+         logger.debug("[DONE] Initializing WarpEnv")
+ 
+-    def reset_idx(self, env_ids):
++    def update_vertices(self):
++        """按资产当前的根位姿，把顶点从建网格时的位置搬到现在的位置。
++
++        warp 相机打的是 `wp.Mesh` 里烘焙好的顶点（warp_camera_kernels 直接
++        `mesh_query_ray`），它不会自己跟着 PhysX 走。不重算顶点 + refit，
++        画面里就是建网格那一刻的静止场景。
++        """
+         if self.global_vertex_counter == 0:
+             return
+-        # logger.debug("Updating vertex maps per env")
+         self.vertex_maps_per_env_updated[:] = tf_apply(
+             self.unfolded_env_vec_root_tensor[self.CONST_GLOBAL_VERTEX_TO_ASSET_INDEX_TENSOR, 3:7],
+             self.unfolded_env_vec_root_tensor[self.CONST_GLOBAL_VERTEX_TO_ASSET_INDEX_TENSOR, 0:3],
+             self.VERTEX_MAPS_PER_ENV_ORIGINAL[:],
+         )
+-        # logger.debug("[DONE] Updating vertex maps per env")
+ 
+-        # logger.debug("Refitting warp meshes")
++    def refit(self, env_ids=None):
++        """重建 BVH。改了顶点就必须调，否则射线还是按旧几何求交。"""
++        if self.global_vertex_counter == 0:
++            return
++        if env_ids is None:
++            env_ids = range(self.num_envs)
+         for i in env_ids:
+-            self.warp_mesh_per_env[i].refit()
+-        # logger.debug("[DONE] Refitting warp meshes")
++            self.warp_mesh_per_env[int(i)].refit()
++
++    def update_meshes(self, env_ids=None):
++        self.update_vertices()
++        self.refit(env_ids)
++
++    def reset_idx(self, env_ids):
++        self.update_meshes(env_ids)
+ 
+     def pre_physics_step(self, action):
+         pass
+ 
+     def post_physics_step(self):
+-        pass
++        # ⚠️ 这里原来也是 pass，是个静默的坑：物理每步都在积分资产的位置，
++        # 但 warp 网格只在 `reset_idx` 时重算过一次，于是**移动的物体在深度/分割
++        # 图里冻在出生点**，不报错、不警告。目标资产被 env_actions 驱动时就是
++        # 这个症状（渲染里的目标一直停在 reset 位置，可见率卡在 54%）。
++        #
++        # reset_idx 里的重算逻辑抽成了 update_meshes()，这里每步照做一次。
++        self.update_meshes()
+ 
+     def step(self, action):
+         pass
