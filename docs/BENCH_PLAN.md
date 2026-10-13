@@ -769,3 +769,19 @@ P1–P5 全部通过后，对照下面这张表逐条打勾（**2026-10-12 全�
 - 踩的坑：无（SSH 443 通道是新发现，已记 SETUP_NOTES「网络」）。
 - 下一步：有代码更新时 `./make_aerial_track.sh` → `cd aerial-track && git commit && git push`；
   可选：GitHub Release 挂 `aerial-track.tar.gz`（网页手动，非必需）。
+
+**2026-10-13　场景巡览视频：tracking_env 三路原地转一圈　✅**
+
+- 做了：
+  1. `code/record_sim.py` 补 tracking_env **布局钉固**（reset 后自动
+     `tracking_lib.pin_static_layout()`，之前圆柱随机撒，见 SETUP_NOTES
+     「用代码搭建环境」末条）。
+  2. 录视频 `outputs/videos/2026-10-13-tracking-pan-3view.mp4`：
+     `record_sim.py --env tracking_env --view all --use-warp False --pan
+     --pan-pos 0 0 2 --steps 300 --device cuda:4`（机位场地中心 z=2，偏航
+     -π→+π 匀速扫满一圈；三路 = RGB|深度|分割 并排，同一帧逐像素对齐）。
+- 验收数字：300 帧 **1440×270**（3×480×270），10.0 s；抽 4 帧（0/75/150/225）
+  核对：墙环带缺口、目标钉在 (2,0,2)、圆柱外圈、四向各有内容。
+  占 2 卡（cuda:4 仿真 + 物理 0 号卡上甩不掉的 ~450MB 上下文，RGB 路径的固定开销）。
+- 踩的坑：record_sim 不钉布局（SETUP_NOTES「用代码搭建环境」末条，已修）。
+- 下一步：无。重录同命令即可；想让目标也动起来改用 `run_tracking.py`。

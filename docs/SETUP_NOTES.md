@@ -508,6 +508,20 @@ URDF 里圆柱默认原点在几何中心，那样不同高度的圆柱要配不
 整张图糊成一种黄色 —— 恰好丢掉了"区分每个实例"这个最要紧的信息。
 现在改成按黄金比例散列色相，相邻 id 颜色差别很大，见 `record_sim.py` 的 `to_uint8`。
 
+### ⚠️ `record_sim.py --env tracking_env` 录出来圆柱是**随机撒的** —— 不是 arena_20x20.yaml 的场地
+
+**现象**：录 tracking_env 场景视频，6 根圆柱每次都撒在不同位置（可能撒到场地中央、
+甚至相机机位上），和 `configs/arena_20x20.yaml` 的固定布局（半径 8.5 外圈）对不上。
+**根因**：6 根圆柱共用一个资产类，配置做不到 6 个固定位置（见 `tracking_lib.
+pin_static_layout` 的说明），必须在**每次 reset 之后**覆写状态张量。`run_tracking.py`
+一直有这一步，`record_sim.py` 没有 —— 布局静默错，不报任何错。
+**修法**：`record_sim.py` 在 `reset()` / `reset_terminated_and_truncated_envs()`
+之后自动调 `pin_layout_if_needed()`（仅 `--env tracking_env` 时生效，别的环境槽位
+含义不同，不能乱写）。
+**怎么验证**：`python record_sim.py --env tracking_env --view all --use-warp False
+--pan --pan-pos 0 0 2 --steps 300 --device cuda:4 --out /outputs/videos/xxx.mp4`
+抽 4 帧核对：墙环带缺口、目标钉在 (2,0,2)、圆柱在外圈（2026-10-13 实测通过）。
+
 ## 跟踪闭环（阶段 1）踩过的坑
 
 阶段 1（目标绕圈飞 + 追踪机跟随 + 录深度视频）已经跑通，产物在
