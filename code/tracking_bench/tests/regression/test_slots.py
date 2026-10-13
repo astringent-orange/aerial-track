@@ -6,8 +6,8 @@ appendleft 规则决定，`tracking_lib.py` 按 YAML 墙数自动推导：
 
     槽 0      target
     槽 1      bottom_wall（地板 mesh）
-    槽 2..9   walls（8 面，**YAML 逆序**：槽 2 = wall_07 ... 槽 9 = wall_00）
-    槽 10..17 cylinders（8 根）
+    槽 2..8   walls（7 面，**YAML 逆序**：槽 2 = wall_06 ... 槽 8 = wall_00）
+    槽 9..16  cylinders（8 根）
 
 改 tracking_env 的 map 顺序、改 arena YAML 的墙数/圆柱数，这里就该红 ——
 槽位对不上意味着 `pin_static_layout()` 钉错物体、`write_target` 写错 actor，
@@ -32,7 +32,7 @@ def main():
         ok = ok and cond
         print(f"  {'✅' if cond else '❌'} {name}" + (f": {detail}" if detail else ""))
 
-    check("N_WALLS == 8", tl.N_WALLS == 8, str(tl.N_WALLS))
+    check("N_WALLS == 7", tl.N_WALLS == 7, str(tl.N_WALLS))
     check("N_CYLINDERS == 8", tl.N_CYLINDERS == 8, str(tl.N_CYLINDERS))
     check("CYLINDER_SIZE == (0.6, 0.6, 3.0)", tl.CYLINDER_SIZE == (0.6, 0.6, 3.0),
           str(tl.CYLINDER_SIZE))
@@ -44,14 +44,14 @@ def main():
     # 墙：YAML 逆序，第 i 面墙在 2 + (N_WALLS-1-i)
     got = [tl.wall_slot(i) for i in range(tl.N_WALLS)]
     want = [2 + (tl.N_WALLS - 1 - i) for i in range(tl.N_WALLS)]
-    check("wall_slot 逆序 2..9", got == want, f"{got} vs {want}")
-    check("wall_slot(0) == 9（YAML 第一面墙在最后一槽）",
+    check("wall_slot 逆序 2..8", got == want, f"{got} vs {want}")
+    check("wall_slot(0) == 8（YAML 第一面墙在最后一槽）",
           tl.wall_slot(0) == 2 + tl.N_WALLS - 1, str(tl.wall_slot(0)))
-    check("wall_slot(7) == 2（YAML 最后一面墙在槽 2）",
+    check("wall_slot(6) == 2（YAML 最后一面墙在槽 2）",
           tl.wall_slot(tl.N_WALLS - 1) == 2, str(tl.wall_slot(tl.N_WALLS - 1)))
 
-    check("CYLINDER_SLOT_START == 2 + N_WALLS == 10",
-          tl.CYLINDER_SLOT_START == 2 + tl.N_WALLS and tl.CYLINDER_SLOT_START == 10,
+    check("CYLINDER_SLOT_START == 2 + N_WALLS == 9",
+          tl.CYLINDER_SLOT_START == 2 + tl.N_WALLS and tl.CYLINDER_SLOT_START == 9,
           str(tl.CYLINDER_SLOT_START))
     check("CYLINDER_SLOT_END == START + N_CYLINDERS",
           tl.CYLINDER_SLOT_END == tl.CYLINDER_SLOT_START + tl.N_CYLINDERS,

@@ -34,7 +34,7 @@ def main():
     cfg2 = bench_config.load_config(find_config("scene_lost.yaml"))
     assert os.path.isfile(cfg2.arena_yaml), cfg2.arena_yaml
 
-    assert tl.N_WALLS == 8 and tl.N_CYLINDERS == 8, (tl.N_WALLS, tl.N_CYLINDERS)
+    assert tl.N_WALLS == 7 and tl.N_CYLINDERS == 8, (tl.N_WALLS, tl.N_CYLINDERS)
     assert tl.CYLINDER_SIZE == (0.6, 0.6, 3.0), tl.CYLINDER_SIZE
     assert os.path.isfile(wp._CFG_PATH)
 

@@ -400,7 +400,7 @@ index 0000000..f5cfaa1
 +        }
 diff --git a/aerial_gym/config/env_config/tracking_env.py b/aerial_gym/config/env_config/tracking_env.py
 new file mode 100644
-index 0000000..3c689ac
+index 0000000..16153cf
 --- /dev/null
 +++ b/aerial_gym/config/env_config/tracking_env.py
 @@ -0,0 +1,176 @@
@@ -426,13 +426,13 @@ index 0000000..3c689ac
 +`keep_in_env=False` 的资产用 `append` 追加到队尾。
 +
 +本文件的 map 顺序是
-+`cylinders(keep=F) -> wall_00..wall_07(keep=T) -> bottom_wall(keep=T) -> target(keep=T)`，
++`cylinders(keep=F) -> wall_00..wall_06(keep=T) -> bottom_wall(keep=T) -> target(keep=T)`，
 +于是实际槽位是：
 +
 +    槽 0      target         <- 驱动代码写 twist[:, 0, :]
 +    槽 1      bottom_wall    <- 地板 mesh
-+    槽 2..9   walls（8 面，**YAML 逆序**：槽 2 = wall_07 ... 槽 9 = wall_00）
-+    槽 10..17 cylinders（8 根）
++    槽 2..8   walls（7 面，**YAML 逆序**：槽 2 = wall_06 ... 槽 8 = wall_00）
++    槽 9..16  cylinders（8 根）
 +
 +改 map 顺序会改槽位，驱动代码就会推错东西，而且**不报错**。
 +启动时用 `check_p1.py` / `run_tracking.py` 打印 `ASSET_SLOT_ORDER` 核对一次。
@@ -522,10 +522,10 @@ index 0000000..3c689ac
 +    return list(ordered)
 +
 +
-+# 形如 [("target", 0), ("bottom_wall", 0), ("wall_07", 0), ..., ("cylinders", 7)]
++# 形如 [("target", 0), ("bottom_wall", 0), ("wall_06", 0), ..., ("cylinders", 7)]
 +ASSET_SLOT_ORDER = compute_asset_slot_order(_asset_type_to_dict_map, _include_asset_type)
 +
-+# 形如 {"target": 0, "bottom_wall": 1, "wall_00": 9, ..., "cylinders": 10}
++# 形如 {"target": 0, "bottom_wall": 1, "wall_00": 8, ..., "cylinders": 9}
 +# 注意多实例类（cylinders）这里只记**第一个**实例的槽位。
 +ASSET_SLOT = {key: slot for slot, (key, _i) in enumerate(ASSET_SLOT_ORDER)}
 +
