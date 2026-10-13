@@ -400,10 +400,10 @@ index 0000000..f5cfaa1
 +        }
 diff --git a/aerial_gym/config/env_config/tracking_env.py b/aerial_gym/config/env_config/tracking_env.py
 new file mode 100644
-index 0000000..81e6c9f
+index 0000000..3c689ac
 --- /dev/null
 +++ b/aerial_gym/config/env_config/tracking_env.py
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,176 @@
 +"""跟踪实验环境 —— 20x20x5 场地 + 地板 + 薄墙 + 圆柱 + 1 个可动目标。
 +
 +从 empty_with_cylinders 出发，改了跟踪实验必需的几处：
@@ -432,7 +432,7 @@ index 0000000..81e6c9f
 +    槽 0      target         <- 驱动代码写 twist[:, 0, :]
 +    槽 1      bottom_wall    <- 地板 mesh
 +    槽 2..9   walls（8 面，**YAML 逆序**：槽 2 = wall_07 ... 槽 9 = wall_00）
-+    槽 10..15 cylinders（6 根）
++    槽 10..17 cylinders（8 根）
 +
 +改 map 顺序会改槽位，驱动代码就会推错东西，而且**不报错**。
 +启动时用 `check_p1.py` / `run_tracking.py` 打印 `ASSET_SLOT_ORDER` 核对一次。
@@ -443,8 +443,8 @@ index 0000000..81e6c9f
 +（`asset_loader.py:87` 是按资产类取的，不是按实例）。
 +
 +- **墙**：一面墙一个类，min == max，位置由 YAML 直接算出 -> reset 就是对的。
-+- **圆柱**：6 根共用一个类，做不到 6 个不同位置，只能在 reset 之后由
-+  `tracking_lib.pin_cylinder_layout()` 覆写状态张量。
++- **圆柱**：所有圆柱共用一个类，做不到每根一个固定位置，只能在 reset 之后由
++  `tracking_lib.pin_static_layout()` 覆写状态张量。
 +
 +用法（容器内，先 cd /workspace）：
 +    python record_sim.py --env tracking_env --device cuda:6 --out tracking.mp4
@@ -463,13 +463,14 @@ index 0000000..81e6c9f
 +
 +
 +class _tracking_cylinders(cylinder_asset_params):
-+    """6 根圆柱，放在 20x20 场地的外围。
++    """8 根圆柱，环内散点（configs/arena_20x20.yaml 的 cylinders.positions）。
 +
-+    薄墙已经在半径 5.5~6.4 围了一圈，圆柱放到更外圈（半径 8.5）当散点障碍，
-+    不挡中心的飞行空间。实际布局由 tracking_lib.pin_cylinder_layout() 固定覆写。
++    2026-10-13 从"外圈 6 根"改成"环内 8 根"：外圈的柱子被墙环挡住，
++    从场心只见柱顶露头（叠影 + "看不到圆柱"），见 YAML 注释。
++    实际布局由 tracking_lib.pin_static_layout() 固定覆写。
 +    """
 +
-+    num_assets = 6
++    num_assets = 8
 +
 +    # x, y 比例在 [0.02, 0.98]，接近全场地 —— 固定布局会覆盖掉。
 +    # z 保持 0（URDF 原点在底面，z=0 就立在地上）。
@@ -521,7 +522,7 @@ index 0000000..81e6c9f
 +    return list(ordered)
 +
 +
-+# 形如 [("target", 0), ("bottom_wall", 0), ("wall_07", 0), ..., ("cylinders", 5)]
++# 形如 [("target", 0), ("bottom_wall", 0), ("wall_07", 0), ..., ("cylinders", 7)]
 +ASSET_SLOT_ORDER = compute_asset_slot_order(_asset_type_to_dict_map, _include_asset_type)
 +
 +# 形如 {"target": 0, "bottom_wall": 1, "wall_00": 9, ..., "cylinders": 10}

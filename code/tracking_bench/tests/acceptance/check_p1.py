@@ -201,8 +201,8 @@ def main():
                    st[tl.CYLINDER_SLOT_START + i, 1] - xy[1]) < 1e-3
         for i, xy in enumerate(tl.CYLINDER_XY)
     )
-    check("2c 圆柱在外围固定布局", cyl_ok,
-          f"6 根在半径 8.5 处，槽 {tl.CYLINDER_SLOT_START}..{tl.CYLINDER_SLOT_END - 1}")
+    check("2c 圆柱按 YAML 固定布局", cyl_ok,
+          f"{tl.N_CYLINDERS} 根环内散点，槽 {tl.CYLINDER_SLOT_START}..{tl.CYLINDER_SLOT_END - 1}")
 
     # ---------- 3. 渲染：墙看不看得见 ----------
     print("=" * 78, flush=True)

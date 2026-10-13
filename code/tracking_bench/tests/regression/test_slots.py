@@ -7,7 +7,7 @@ appendleft 规则决定，`tracking_lib.py` 按 YAML 墙数自动推导：
     槽 0      target
     槽 1      bottom_wall（地板 mesh）
     槽 2..9   walls（8 面，**YAML 逆序**：槽 2 = wall_07 ... 槽 9 = wall_00）
-    槽 10..15 cylinders（6 根）
+    槽 10..17 cylinders（8 根）
 
 改 tracking_env 的 map 顺序、改 arena YAML 的墙数/圆柱数，这里就该红 ——
 槽位对不上意味着 `pin_static_layout()` 钉错物体、`write_target` 写错 actor，
@@ -33,7 +33,7 @@ def main():
         print(f"  {'✅' if cond else '❌'} {name}" + (f": {detail}" if detail else ""))
 
     check("N_WALLS == 8", tl.N_WALLS == 8, str(tl.N_WALLS))
-    check("N_CYLINDERS == 6", tl.N_CYLINDERS == 6, str(tl.N_CYLINDERS))
+    check("N_CYLINDERS == 8", tl.N_CYLINDERS == 8, str(tl.N_CYLINDERS))
     check("CYLINDER_SIZE == (0.6, 0.6, 3.0)", tl.CYLINDER_SIZE == (0.6, 0.6, 3.0),
           str(tl.CYLINDER_SIZE))
 
@@ -53,14 +53,16 @@ def main():
     check("CYLINDER_SLOT_START == 2 + N_WALLS == 10",
           tl.CYLINDER_SLOT_START == 2 + tl.N_WALLS and tl.CYLINDER_SLOT_START == 10,
           str(tl.CYLINDER_SLOT_START))
-    check("CYLINDER_SLOT_END == 16", tl.CYLINDER_SLOT_END == 16,
+    check("CYLINDER_SLOT_END == START + N_CYLINDERS",
+          tl.CYLINDER_SLOT_END == tl.CYLINDER_SLOT_START + tl.N_CYLINDERS,
           str(tl.CYLINDER_SLOT_END))
 
-    # 槽位互不重叠、刚好铺满 0..15
+    # 槽位互不重叠、刚好铺满 0..(2+N_WALLS+N_CYLINDERS-1)
+    n_slots = 2 + tl.N_WALLS + tl.N_CYLINDERS
     all_slots = ([tl.TARGET_SLOT, tl.BOTTOM_WALL_SLOT]
                  + [tl.wall_slot(i) for i in range(tl.N_WALLS)]
                  + list(range(tl.CYLINDER_SLOT_START, tl.CYLINDER_SLOT_END)))
-    check("槽位 0..15 不重不漏", sorted(all_slots) == list(range(16)),
+    check(f"槽位 0..{n_slots - 1} 不重不漏", sorted(all_slots) == list(range(n_slots)),
           str(sorted(all_slots)))
 
     print("✅ 槽位顺序正确" if ok else "❌ 槽位顺序有错")

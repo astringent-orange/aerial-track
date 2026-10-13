@@ -1,7 +1,7 @@
 """跟踪闭环用的几何与控制，阶段 0/1（闭环）和阶段 2（测试环境）共用。
 
 拆成一个库是因为几件事都要用同一批常量，写两遍必然会对不上：
-  - 墙 / 圆柱固定布局（配置做不到 6 根不同位置，见 pin_static_layout）
+  - 墙 / 圆柱固定布局（配置做不到多根不同位置，见 pin_static_layout）
   - 目标轨迹 / 追踪机跟随
 
 槽位约定（由 tracking_env.py 的 asset_type_to_dict_map 顺序 + keep_in_env 的
@@ -10,7 +10,7 @@ appendleft 规则决定，本文件按 YAML 墙数自动推导）：
     槽 0      target
     槽 1      bottom_wall（地板 mesh）
     槽 2..    walls（N 面，**YAML 逆序**：槽 2 = wall_{N-1} ... 槽 N+1 = wall_00）
-    之后      cylinders（6 根）
+    之后      cylinders（N 根）
 
 改 tracking_env 的 map 顺序或 configs/arena_20x20.yaml 的墙数就会改这些数字，
 先跑 check_p1.py 打印 ASSET_SLOT_ORDER 核对。
@@ -147,16 +147,16 @@ CHASER_SPEED_LIMIT = 3.0  # m/s
 # ---- 圆柱固定布局 ----
 # 布局数据在 `configs/arena_20x20.yaml` 的 `cylinders:` 一节（唯一来源），
 # 文件开头已读进 CYLINDER_XY / CYLINDER_SIZE / N_CYLINDERS。
-# 20x20 场地：薄墙已经在半径 5.5~6.4 围了一圈，圆柱放到更外圈当散点障碍，
-# 不挡中心的飞行空间（半径 8.5，离墙环最近 3.0 m）。
+# 20x20 场地：圆柱在墙环**内侧**散点（半径 3.4/4.6，方位与墙错开）——
+# 2026-10-13 从外圈 8.5 挪进来的，原因见 YAML 注释（外圈被墙挡住 + 叠影）。
 
 
 def pin_static_layout(env_manager, device=None):
     """把墙、圆柱、目标按固定布局摆好。
 
     为什么必须这样做：`asset_loader.py:87` 把 min/max_state_ratio 存在**资产类**
-    上，同一个类的所有实例共用同一对范围 —— 6 根圆柱共用一个类，配置本身做不到
-    "6 个固定的不同位置"（min==max 会让 6 根叠在同一个点）。所以只能在 reset 之后
+    上，同一个类的所有实例共用同一对范围 —— 所有圆柱共用一个类，配置本身做不到
+    "每根一个固定位置"（min==max 会让它们叠在同一个点）。所以只能在 reset 之后
     覆写状态张量。
 
     墙是一面一个类、min==max，reset 本身就摆对了；这里再写一次是保险
