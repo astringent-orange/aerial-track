@@ -177,6 +177,19 @@ git config --global url."https://ghfast.top/https://github.com/".insteadOf "http
 - **git 重写配在容器的 git config 里，重建容器会丢** —— 每次
   `docker rm`/重建 `aerialgym_dev` 后要重新执行上面那条 `git config`。
 
+**推送/拉自己的仓库走 SSH 443，不用镜像**（2026-10-13 实测）：`ssh.github.com:443`
+可达且本机密钥已注册（GitHub 账号 `astringent-orange`），宿主 `~/.ssh/config` 配了
+
+```
+Host github.com
+    HostName ssh.github.com
+    Port 443
+```
+
+之后 `git@github.com:OWNER/REPO.git` 照常 push/pull。该配置在**宿主 home**，
+不在容器里，重建容器不受影响。`api.github.com` 也可直连（管理 API 能用）。
+用途：`aerial-track` 仓库（github.com/astringent-orange/aerial-track）就靠它推送。
+
 pip 走 pypi.org（可通，约 5s 延迟）。若想加速可加环境变量：
 
 ```bash

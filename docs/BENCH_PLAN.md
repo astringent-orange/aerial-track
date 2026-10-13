@@ -747,3 +747,25 @@ P1–P5 全部通过后，对照下面这张表逐条打勾（**2026-10-12 全�
   离线回归 **5/5**。
 - 踩的坑：无。
 - 下一步：讨论把 aerial-track/ 内容发到 GitHub 的方案（见对话）。
+
+**2026-10-13　发布到 GitHub：改名 `aerial-track` + 仓库上线　✅**
+
+- 背景（新要求）：交接文件上传 GitHub，他人按教程逐步构建环境，后续更新好推。
+- 做了：
+  1. **改名**（用户嫌 `handoff` 不好听、`aerial-gym-tracking-bench` 太长）：
+     `handoff/` → `aerial-track/`，`make_handoff.sh` → `make_aerial_track.sh`，
+     `handoff.tar.gz` → `aerial-track.tar.gz`；全库引用 sweep（测试夹具
+     `handoff_tracker.py` / tracker `name="handoff"` 是接口标识符，刻意保留）。
+  2. **仓库**：github.com/astringent-orange/**aerial-track**（Public），
+     仓库根 = 原交接包内容；`.gitignore` 挡掉上游源码、运行产物、pyc；
+     首个提交 58 项 + tag **`v2026-10-13`**。
+  3. **推送通道**：`github.com` 直连超时，但 `ssh.github.com:443` 可达且本机
+     密钥已注册 —— 宿主 `~/.ssh/config` 配 `github.com → ssh.github.com:443`，
+     push/pull 照常（详见 SETUP_NOTES「网络」节）。`api.github.com` 也可直连。
+  4. README 补「怎么拿到它」（git clone / ghfast 镜像 / ZIP / tar 四种）；
+     tar 打包时排除 `.git`（169 KB）。
+- 验收数字：`git push -u origin main` 成功，`git ls-remote` 见 `main` +
+  `v2026-10-13` 两条 ref；改名后打包 169 KB、补丁仍 8 文件、离线回归 5/5。
+- 踩的坑：无（SSH 443 通道是新发现，已记 SETUP_NOTES「网络」）。
+- 下一步：有代码更新时 `./make_aerial_track.sh` → `cd aerial-track && git commit && git push`；
+  可选：GitHub Release 挂 `aerial-track.tar.gz`（网页手动，非必需）。
